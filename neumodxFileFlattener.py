@@ -189,11 +189,11 @@ class nmdx_file_parser:
         return flat_data.reset_index()
 
 
-external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
+#external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
-app = dash.Dash(__name__, suppress_callback_exceptions=True)
-
-app.layout = html.Div([ # this code section taken from Dash docs https://dash.plotly.com/dash-core-components/upload
+dash_app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
+app = dash_app.server
+dash_app.layout = html.Div([ # this code section taken from Dash docs https://dash.plotly.com/dash-core-components/upload
     dcc.Upload(
         id='upload-data',
         children=html.Div([
@@ -262,16 +262,16 @@ app.layout = html.Div([ # this code section taken from Dash docs https://dash.pl
 
 ])
 
-app.title = 'NMDX Raw Data File Flattener'
+dash_app.title = 'NMDX Raw Data File Flattener'
 
 
 def parse_contents(contents, filename, date):
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     try:
-        df = app.myParser.scrapeFile(io.BytesIO(decoded), filename)
-        app.myDataFrame = pd.concat([app.myDataFrame, df])
-        app.myDataFrame.drop_duplicates(subset=['Test Guid', 'Replicate Number', 'Processing Step', 'Channel'],inplace=True)
+        df = dash_app.myParser.scrapeFile(io.BytesIO(decoded), filename)
+        dash_app.myDataFrame = pd.concat([dash_app.myDataFrame, df])
+        dash_app.myDataFrame.drop_duplicates(subset=['Test Guid', 'Replicate Number', 'Processing Step', 'Channel'],inplace=True)
     except Exception as e:
         print(e)
         return html.Div([
@@ -280,11 +280,11 @@ def parse_contents(contents, filename, date):
 
     return html.Div([
         html.H5(filename+" was read successfully"),
-        html.H5("Length of DataFrame: "+str(len(app.myDataFrame))),
+        html.H5("Length of DataFrame: "+str(len(dash_app.myDataFrame))),
     ])
 
 
-@app.callback(Output('output-datatable', 'children'),
+@dash_app.callback(Output('output-datatable', 'children'),
               Input('upload-data', 'contents'),
               State('upload-data', 'filename'),
               State('upload-data', 'last_modified'))
@@ -296,27 +296,27 @@ def update_output(list_of_contents, list_of_names, list_of_dates):
         return children
 
 
-@app.callback(Output('output-div', 'children'),
-              Input('submit-button','n_clicks'),
-              State('stored-data','data'),
-              State('xaxis-data','value'),
-              State('yaxis-data', 'value'))
-def make_graphs(n, data, x_data, y_data):
-    if n is None:
-        return dash.no_update
-    else:
-        bar_fig = px.bar(data, x=x_data, y=y_data)
-        # print(data)
-        return dcc.Graph(figure=bar_fig)
+# @dash_app.callback(Output('output-div', 'children'),
+#               Input('submit-button','n_clicks'),
+#               State('stored-data','data'),
+#               State('xaxis-data','value'),
+#               State('yaxis-data', 'value'))
+# def make_graphs(n, data, x_data, y_data):
+#     if n is None:
+#         return dash.no_update
+#     else:
+#         bar_fig = px.bar(data, x=x_data, y=y_data)
+#         # print(data)
+#         return dcc.Graph(figure=bar_fig)
 
-@app.callback(
+@dash_app.callback(
     Output("download-component", "data"),
     Input("btn", "n_clicks"),
     prevent_initial_call=True,
 )
 def func(n_clicks):
     #return dict(content="Always remember, we're better together.", filename="hello.txt")
-    return dcc.send_data_frame(app.myDataFrame.to_csv, "mydf_csv.csv")
+    return dcc.send_data_frame(dash_app.myDataFrame.to_csv, "FlatData.csv")
     #return dcc.send_data_frame(app.myDataFrame.to_excel, "mydf_excel.xlsx", sheet_name="Flat Raw Data")
     # return dcc.send_file("./assets/data_file.txt")
     # return dcc.send_file("./assets/bees-by-Lisa-from-Pexels.jpg")
@@ -324,7 +324,7 @@ def func(n_clicks):
 
 
 if __name__ == '__main__':
-    app.myDataFrame = pd.DataFrame()
-    app.myParser = nmdx_file_parser()
-    app.run_server(debug=True, port=8052)
+    dash_app.myDataFrame = pd.DataFrame()
+    dash_app.myParser = nmdx_file_parser()
+    dash_app.run_server(debug=True)
 
