@@ -193,6 +193,8 @@ class nmdx_file_parser:
 
 dash_app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
 app = dash_app.server
+dash_app.myDataFrame = pd.DataFrame()
+dash_app.myParser = nmdx_file_parser()
 dash_app.layout = html.Div([ # this code section taken from Dash docs https://dash.plotly.com/dash-core-components/upload
     dcc.Upload(
         id='upload-data',
@@ -213,6 +215,7 @@ dash_app.layout = html.Div([ # this code section taken from Dash docs https://da
         # Allow multiple files to be uploaded
         multiple=True
     ),
+    
     html.Div(id='output-div'),
     html.Div(id='stored-data-description'),
     html.Div(id='output-datatable'),
@@ -324,7 +327,6 @@ def func(n_clicks):
 
 
 if __name__ == '__main__':
-    dash_app.myDataFrame = pd.DataFrame()
-    dash_app.myParser = nmdx_file_parser()
+    
     dash_app.run_server(debug=True)
 
