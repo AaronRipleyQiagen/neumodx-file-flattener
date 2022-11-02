@@ -191,7 +191,7 @@ class nmdx_file_parser:
 
 #external_stylesheets = ['https://codepen.io/chriddyp/pen/bWLwgP.css']
 
-dash_app = dash.Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
+dash_app = dash.Dash(__name__, external_stylesheets=[dbc.themes.YETI])
 app = dash_app.server
 dash_app.myDataFrame = pd.DataFrame()
 dash_app.myParser = nmdx_file_parser()
@@ -220,29 +220,30 @@ dash_app.layout = html.Div([ # this code section taken from Dash docs https://da
     html.Div(id='stored-data-description'),
     html.Div(id='output-datatable'),
 
-    # html.Div([
-    #         dcc.Checklist(
-    #             id='my_checklist',                      # used to identify component in callback
-    #             options=[
-    #                      {'label': x, 'value': x, 'disabled':False}
-    #                      for x in ['Add Left / Right Label', 'Add Run Number', 'Another Option', 'Another One', 'Another One']
-    #             ],
-    #             value=[],    # values chosen by default
+    html.Div([
+            dcc.Checklist(
+                id='my_checklist',                      # used to identify component in callback
+                options=[
+                         {'label': x, 'value': x, 'disabled':False}
+                         for x in ['Add Left / Right Label']
+                ],
+                value=[],    # values chosen by default
 
-    #             className='my_box_container',           # class of the container (div)
-    #             # style={'display':'flex'},             # style of the container (div)
+                className='my_box_container',           # class of the container (div)
+                # style={'display':'flex'},             # style of the container (div)
 
-    #             inputClassName='my_box_input',          # class of the <input> checkbox element
-    #             # inputStyle={'cursor':'pointer'},      # style of the <input> checkbox element
+                inputClassName='my_box_input',          # class of the <input> checkbox element
+                # inputStyle={'cursor':'pointer'},      # style of the <input> checkbox element
 
-    #             labelClassName='my_box_label',          # class of the <label> that wraps the checkbox input and the option's label
-    #             labelStyle={
-    #                         'padding':'0.5rem 1rem',},
+                labelClassName='my_box_label',          # class of the <label> that wraps the checkbox input and the option's label
+                labelStyle={
+                            'padding':'0.5rem 1rem',
+                            'border-radius':'10rem'},
 
-    #             #persistence='',                        # stores user's changes to dropdown in memory ( I go over this in detail in Dropdown video: https://youtu.be/UYH_dNSX1DM )
-    #             #persistence_type='',                   # stores user's changes to dropdown in memory ( I go over this in detail in Dropdown video: https://youtu.be/UYH_dNSX1DM )
-    #         ),
-    #     ]),
+                #persistence='',                        # stores user's changes to dropdown in memory ( I go over this in detail in Dropdown video: https://youtu.be/UYH_dNSX1DM )
+                #persistence_type='',                   # stores user's changes to dropdown in memory ( I go over this in detail in Dropdown video: https://youtu.be/UYH_dNSX1DM )
+            ),
+        ]),
 
     html.Div([dbc.Button(id='btn',
             children=[html.I(className="fa fa-download mr-1"), "Download"],
@@ -251,12 +252,13 @@ dash_app.layout = html.Div([ # this code section taken from Dash docs https://da
             style={
             'width': '50%',
             'height': '50px',
-            'lineHeight': '60px',
+            'lineHeight': '25px',
             'borderWidth': '1px',
             'borderStyle': 'solid',
             'borderRadius': '5px',
             'textAlign': 'center',
-            'margin-left': '25%'
+            'margin-left': '25%',
+            'vertical-align': 'center'
             },
         )]),
     
@@ -265,8 +267,13 @@ dash_app.layout = html.Div([ # this code section taken from Dash docs https://da
 
 ])
 
+
 dash_app.title = 'NMDX Raw Data File Flattener'
 
+
+def add_module_side():
+    dash_app.myDataFrame['Left / Right Module Side'] = np.nan
+    dash_app.myDataFrame['Left / Right Module Side'] = np.where(dash_app.myDataFrame['Pcr Cartridge Lane']<7, 'Right', 'Left')
 
 def parse_contents(contents, filename, date):
     content_type, content_string = contents.split(',')
@@ -285,6 +292,10 @@ def parse_contents(contents, filename, date):
         html.H5(filename+" was read successfully"),
         html.H5("Length of DataFrame: "+str(len(dash_app.myDataFrame))),
     ])
+
+
+
+dash_app.annotation_functions = {'Add Left / Right Label': add_module_side}
 
 
 @dash_app.callback(Output('output-datatable', 'children'),
@@ -312,14 +323,20 @@ def update_output(list_of_contents, list_of_names, list_of_dates):
 #         # print(data)
 #         return dcc.Graph(figure=bar_fig)
 
+
 @dash_app.callback(
     Output("download-component", "data"),
     Input("btn", "n_clicks"),
+    [State(component_id='my_checklist', component_property='value')],
     prevent_initial_call=True,
 )
-def func(n_clicks):
+def func(n_clicks, options_chosen):
+    
+    data_output = dash_app.myDataFrame.copy()
+    for option in options_chosen:
+        dash_app.annotation_functions[option]()
     #return dict(content="Always remember, we're better together.", filename="hello.txt")
-    return dcc.send_data_frame(dash_app.myDataFrame.to_csv, "FlatData.csv")
+    return dcc.send_data_frame(data_output.to_csv, "FlatData.csv")
     #return dcc.send_data_frame(app.myDataFrame.to_excel, "mydf_excel.xlsx", sheet_name="Flat Raw Data")
     # return dcc.send_file("./assets/data_file.txt")
     # return dcc.send_file("./assets/bees-by-Lisa-from-Pexels.jpg")
