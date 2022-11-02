@@ -29,7 +29,10 @@ jobs:
       
       - name: Install dependencies
         run: pip install -r requirements.txt
-        
+      
+      - name: Install NMDX specialized dependencies
+        run: pip install nmdatalytix --index-url https://master:juenwbwbj4icexfo3jubkefhd2vgwagtqqysp7qfcqid6hbgxuea@pkgs.dev.azure.com/neumodx/DataAnalysis/_packaging/NeuMoDevsReleaseFeed/pypi/simple/
+      
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
       
       - name: Upload artifact for deployment jobs
