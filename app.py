@@ -1,6 +1,7 @@
 import base64
 import datetime
 import io
+import uuid
 
 import dash
 from dash.dependencies import Input, Output, State
@@ -60,13 +61,10 @@ class nmdx_file_parser:
                 Channel2nd = channelData_all.loc[Channel2ndStart:Channel2ndStart+len(ChannelRaw)]
                 Channel2nd['Processing Step'] = '2nd'
                 #if len(ChannelRaw) == len(ChannelNorm) and len(ChannelRaw) == len(Channel2nd):
-                print("Im in the right block")
                 ChannelFinal = pd.concat([ChannelRaw, ChannelNorm, Channel2nd],axis=0)
                 ChannelFinal['Channel'] = channel
                 ChannelFinal.set_index(['Test Guid', 'Replicate Number'],inplace=True)
 
-                #else:
-                #print("Error in parsing Datablocks")
 
         else:
             ChannelFinal = pd.DataFrame()
@@ -162,7 +160,6 @@ class nmdx_file_parser:
             except:
                 summary_coc.loc[:, col] = np.nan
 
-        print('Read Successful')
 
         channel_readings = channel_readings.astype(object).where(pd.notna(channel_readings), None)
 
@@ -193,9 +190,22 @@ class nmdx_file_parser:
 
 dash_app = dash.Dash(__name__, external_stylesheets=[dbc.themes.YETI])
 app = dash_app.server
-dash_app.myDataFrame = pd.DataFrame()
+
+def add_module_side(data, session_id):
+    dash_app.DataFrames[session_id]['Left / Right Module Side'] = np.nan
+    dash_app.DataFrames[session_id]['Left / Right Module Side'] = np.where(dash_app.DataFrames[session_id]['Pcr Cartridge Lane']<7, 'Right', 'Left')
+
 dash_app.myParser = nmdx_file_parser()
-dash_app.layout = html.Div([ # this code section taken from Dash docs https://dash.plotly.com/dash-core-components/upload
+dash_app.DataFrames = {}
+dash_app.title = 'NMDX Raw Data File Flattener'
+
+dash_app.annotation_functions = {'Add Left / Right Label': add_module_side}
+
+def serve_layout():
+    
+    my_session = str(uuid.uuid4())
+    
+    return html.Div([dcc.Store(id='session-id', data=my_session), # this code section taken from Dash docs https://dash.plotly.com/dash-core-components/upload
     dcc.Upload(
         id='upload-data',
         children=html.Div([
@@ -203,22 +213,21 @@ dash_app.layout = html.Div([ # this code section taken from Dash docs https://da
             html.A('Select Files')
         ]),
         style={
-            'width': '100%',
+            'width': '95%',
             'height': '60px',
             'lineHeight': '60px',
             'borderWidth': '1px',
             'borderStyle': 'dashed',
             'borderRadius': '5px',
             'textAlign': 'center',
-            'margin': '10px'
+            'margin-left': '2.5%'
         },
         # Allow multiple files to be uploaded
-        multiple=True
+        multiple=True,
     ),
     
-    html.Div(id='output-div'),
-    html.Div(id='stored-data-description'),
-    html.Div(id='output-datatable'),
+    html.Div(id='stored-data-description', style={'margin-left':'2.5%'}),
+    html.Div(id='hidden-div'),
 
     html.Div([
             dcc.Checklist(
@@ -237,20 +246,22 @@ dash_app.layout = html.Div([ # this code section taken from Dash docs https://da
 
                 labelClassName='my_box_label',          # class of the <label> that wraps the checkbox input and the option's label
                 labelStyle={
-                            'padding':'0.5rem 1rem',
-                            'border-radius':'10rem'},
+                            
+                            'border-radius':'10rem',
+                            'margin-left':'2.5%'},
 
-                #persistence='',                        # stores user's changes to dropdown in memory ( I go over this in detail in Dropdown video: https://youtu.be/UYH_dNSX1DM )
-                #persistence_type='',                   # stores user's changes to dropdown in memory ( I go over this in detail in Dropdown video: https://youtu.be/UYH_dNSX1DM )
+                #persistence=True,                     # stores user's changes to dropdown in memory ( I go over this in detail in Dropdown video: https://youtu.be/UYH_dNSX1DM )
+                #persistence_type='memory',                   # stores user's changes to dropdown in memory ( I go over this in detail in Dropdown video: https://youtu.be/UYH_dNSX1DM )
             ),
         ]),
 
     html.Div([dbc.Button(id='btn',
-            children=[html.I(className="fa fa-download mr-1"), "Download"],
+            children=[html.I(className="fa fa-download mr-1"), "Download DataFrame"],
             color="info",
             className="mt-1",
+            n_clicks=0,
             style={
-            'width': '50%',
+            'width': '22.5%',
             'height': '50px',
             'lineHeight': '25px',
             'borderWidth': '1px',
@@ -260,86 +271,104 @@ dash_app.layout = html.Div([ # this code section taken from Dash docs https://da
             'margin-left': '25%',
             'vertical-align': 'center'
             },
-        )]),
+        ),
+        dbc.Button(id='clear_btn', children=["Clear DataFrame"], color="info", class_name="mt-1", n_clicks=0, style={
+            'width': '22.5%',
+            'height': '50px',
+            'lineHeight': '25px',
+            'borderWidth': '1px',
+            'borderStyle': 'solid',
+            'borderRadius': '5px',
+            'textAlign': 'center',
+            'margin-left': '5%',
+            'vertical-align': 'center'
+            })]),
     
 
-    dcc.Download(id="download-component"),
-
+    dcc.Download(id="download-component")
 ])
 
-
-dash_app.title = 'NMDX Raw Data File Flattener'
-
-
-def add_module_side(data):
-    dash_app.myDataFrame['Left / Right Module Side'] = np.nan
-    dash_app.myDataFrame['Left / Right Module Side'] = np.where(dash_app.myDataFrame['Pcr Cartridge Lane']<7, 'Right', 'Left')
-
-def parse_contents(contents, filename, date):
+def parse_contents(contents, filename, session_id):
     content_type, content_string = contents.split(',')
     decoded = base64.b64decode(content_string)
     try:
         df = dash_app.myParser.scrapeFile(io.BytesIO(decoded), filename)
-        dash_app.myDataFrame = pd.concat([dash_app.myDataFrame, df])
-        dash_app.myDataFrame.drop_duplicates(subset=['Test Guid', 'Replicate Number', 'Processing Step', 'Channel'],inplace=True)
+        dash_app.DataFrames[session_id] = pd.concat([dash_app.DataFrames[session_id], df])
+        dash_app.DataFrames[session_id].drop_duplicates(subset=['Test Guid', 'Replicate Number', 'Processing Step', 'Channel'],inplace=True)
     except Exception as e:
         print(e)
         return html.Div([
             'There was an error processing this file.'
         ])
-
     return html.Div([
-        html.H5(filename+" was read successfully"),
-        html.H5("Length of DataFrame: "+str(len(dash_app.myDataFrame))),
+        html.H5([filename+" was read successfully   ", "Length of DataFrame: "+str(len(dash_app.DataFrames[session_id]))])
     ])
 
+dash_app.layout = serve_layout
+
+@dash_app.callback(Output('hidden-div', 'children'),
+                    Input('session-id', 'data'))
+
+def initialize_session(session_id):
+    
+    dash_app.DataFrames[session_id] = pd.DataFrame()
+
+    if len(dash_app.DataFrames) > 5:
+        dash_app.DataFrames.popitem()[0]
+
+    
+    return html.Div([])
 
 
-dash_app.annotation_functions = {'Add Left / Right Label': add_module_side}
 
 
-@dash_app.callback(Output('output-datatable', 'children'),
+
+
+
+
+
+@dash_app.callback(Output('stored-data-description', 'children'),
+              Output('clear_btn', 'n_clicks'),
               Input('upload-data', 'contents'),
+              Input('clear_btn', 'n_clicks'),
               State('upload-data', 'filename'),
-              State('upload-data', 'last_modified'))
-def update_output(list_of_contents, list_of_names, list_of_dates):
-    if list_of_contents is not None:
+              State('upload-data', 'last_modified'),
+              Input('session-id', 'data'), prevent_initial_call=True)
+
+def update_output(list_of_contents,  n_clicks, list_of_names, list_of_dates, session_id):
+    
+    if n_clicks==0 and list_of_contents is not None:
+        n_clicks = 0
         children = [
             parse_contents(c, n, d) for c, n, d in
-            zip(list_of_contents, list_of_names, list_of_dates)]
-        return children
+            zip(list_of_contents, list_of_names, [session_id for x in list_of_contents])]
+        return children, n_clicks
+
+    
+    if n_clicks==1:
+        dash_app.DataFrames[session_id] = pd.DataFrame()
+        n_clicks = 0
+        return html.Div([
+            html.H5("DataFrame was cleared successfully"),
+            html.H5("Length of DataFrame: "+str(len(dash_app.DataFrames[session_id]))),
+        ]), n_clicks
 
 
-# @dash_app.callback(Output('output-div', 'children'),
-#               Input('submit-button','n_clicks'),
-#               State('stored-data','data'),
-#               State('xaxis-data','value'),
-#               State('yaxis-data', 'value'))
-# def make_graphs(n, data, x_data, y_data):
-#     if n is None:
-#         return dash.no_update
-#     else:
-#         bar_fig = px.bar(data, x=x_data, y=y_data)
-#         # print(data)
-#         return dcc.Graph(figure=bar_fig)
-
-
-@dash_app.callback(
-    Output("download-component", "data"),
+@dash_app.callback(Output("download-component", "data"),
     Input("btn", "n_clicks"),
-    [State(component_id='my_checklist', component_property='value')],
+    State(component_id='my_checklist', component_property='value'),
+    Input("session-id", "data"),
     prevent_initial_call=True,
 )
-def func(n_clicks, options_chosen):
+def download_function(n_clicks, options_chosen, session_id):
     
-    data_output = dash_app.myDataFrame.copy()
+    data_output = dash_app.DataFrames[session_id].copy()
     for option in options_chosen:
-        dash_app.annotation_functions[option](data_output)
-    #return dict(content="Always remember, we're better together.", filename="hello.txt")
-    return dcc.send_data_frame(data_output.to_csv, "FlatData.csv")
-    #return dcc.send_data_frame(app.myDataFrame.to_excel, "mydf_excel.xlsx", sheet_name="Flat Raw Data")
-    # return dcc.send_file("./assets/data_file.txt")
-    # return dcc.send_file("./assets/bees-by-Lisa-from-Pexels.jpg")
+        dash_app.annotation_functions[option](data_output, session_id)
+   
+   
+    return dcc.send_data_frame(data_output.to_csv, "FlatData.csv", index=False)
+
 
 
 
