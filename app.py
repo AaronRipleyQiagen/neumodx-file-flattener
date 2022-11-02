@@ -192,8 +192,8 @@ dash_app = dash.Dash(__name__, external_stylesheets=[dbc.themes.YETI])
 app = dash_app.server
 
 def add_module_side(data, session_id):
-    dash_app.DataFrames[session_id]['Left / Right Module Side'] = np.nan
-    dash_app.DataFrames[session_id]['Left / Right Module Side'] = np.where(dash_app.DataFrames[session_id]['Pcr Cartridge Lane']<7, 'Right', 'Left')
+    data['Left / Right Module Side'] = np.nan
+    data['Left / Right Module Side'] = np.where(data['Pcr Cartridge Lane']<7, 'Right', 'Left')
 
 dash_app.myParser = nmdx_file_parser()
 dash_app.DataFrames = {}
@@ -318,12 +318,6 @@ def initialize_session(session_id):
 
     
     return html.Div([])
-
-
-
-
-
-
 
 
 
