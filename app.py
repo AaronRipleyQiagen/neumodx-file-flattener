@@ -271,7 +271,7 @@ dash_app.layout = html.Div([ # this code section taken from Dash docs https://da
 dash_app.title = 'NMDX Raw Data File Flattener'
 
 
-def add_module_side():
+def add_module_side(data):
     dash_app.myDataFrame['Left / Right Module Side'] = np.nan
     dash_app.myDataFrame['Left / Right Module Side'] = np.where(dash_app.myDataFrame['Pcr Cartridge Lane']<7, 'Right', 'Left')
 
@@ -334,7 +334,7 @@ def func(n_clicks, options_chosen):
     
     data_output = dash_app.myDataFrame.copy()
     for option in options_chosen:
-        dash_app.annotation_functions[option]()
+        dash_app.annotation_functions[option](data_output)
     #return dict(content="Always remember, we're better together.", filename="hello.txt")
     return dcc.send_data_frame(data_output.to_csv, "FlatData.csv")
     #return dcc.send_data_frame(app.myDataFrame.to_excel, "mydf_excel.xlsx", sheet_name="Flat Raw Data")
