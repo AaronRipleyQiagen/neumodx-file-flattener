@@ -191,7 +191,7 @@ class nmdx_file_parser:
 dash_app = dash.Dash(__name__, external_stylesheets=[dbc.themes.YETI])
 app = dash_app.server
 
-def add_module_side(data, session_id):
+def add_module_side(data):
     data['Left / Right Module Side'] = np.nan
     data['Left / Right Module Side'] = np.where(data['Pcr Cartridge Lane']<7, 'Right', 'Left')
 
@@ -320,7 +320,6 @@ def initialize_session(session_id):
     return html.Div([])
 
 
-
 @dash_app.callback(Output('stored-data-description', 'children'),
               Output('clear_btn', 'n_clicks'),
               Input('upload-data', 'contents'),
@@ -358,7 +357,7 @@ def download_function(n_clicks, options_chosen, session_id):
     
     data_output = dash_app.DataFrames[session_id].copy()
     for option in options_chosen:
-        dash_app.annotation_functions[option](data_output, session_id)
+        dash_app.annotation_functions[option](data_output)
    
    
     return dcc.send_data_frame(data_output.to_csv, "FlatData.csv", index=False)
