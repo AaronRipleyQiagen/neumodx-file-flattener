@@ -195,11 +195,26 @@ def add_module_side(data):
     data['Left / Right Module Side'] = np.nan
     data['Left / Right Module Side'] = np.where(data['Pcr Cartridge Lane']<7, 'Right', 'Left')
 
+def getRawMinusBlankCheckReads(data):
+        """
+        A Function used to calculate the Difference between the First three Raw Readings and Blank Check Values for each target result included in dataset provided
+        Parameters
+        ----------
+        data (pandas.DataFrame) = DataFrame to be used for Calculation.
+        """
+        RawReadsMinusBlankCheckFrame = data[['Processing Step', 'Test Guid', 'Replicate Number', 'Target Result Guid']+['Readings 1', 'Readings 2', 'Readings 3', 'Blank Reading']].copy()
+        RawReadsMinusBlankCheckFrame.set_index(['Processing Step', 'Test Guid', 'Replicate Number', 'Target Result Guid'],inplace=True)
+        RawReadsMinusBlankCheckFrame_Raw = RawReadsMinusBlankCheckFrame.loc['Raw']
+        RawReadsMinusBlankCheckFrame_Raw['Blank Check - 1st 3 Reads'] = RawReadsMinusBlankCheckFrame_Raw[['Readings 1', 'Readings 2', 'Readings 3']].mean(axis=1) - RawReadsMinusBlankCheckFrame_Raw['Blank Reading']
+        RawReadsMinusBlankCheckFrame = RawReadsMinusBlankCheckFrame.join(RawReadsMinusBlankCheckFrame_Raw[['Blank Check - 1st 3 Reads']])
+        data['Blank Check - 1st 3 Reads'] = RawReadsMinusBlankCheckFrame['Blank Check - 1st 3 Reads'].values
+
 dash_app.myParser = nmdx_file_parser()
 dash_app.DataFrames = {}
 dash_app.title = 'NMDX Raw Data File Flattener'
 
-dash_app.annotation_functions = {'Add Left / Right Label': add_module_side}
+dash_app.annotation_functions = {'Add Left / Right Label': add_module_side,
+                                 'Add First Three Raw Reads - Blank Check':getRawMinusBlankCheckReads}
 
 def serve_layout():
     
@@ -234,7 +249,7 @@ def serve_layout():
                 id='my_checklist',                      # used to identify component in callback
                 options=[
                          {'label': x, 'value': x, 'disabled':False}
-                         for x in ['Add Left / Right Label']
+                         for x in ['Add Left / Right Label', 'Add First Three Raw Reads - Blank Check']
                 ],
                 value=[],    # values chosen by default
 
@@ -367,5 +382,5 @@ def download_function(n_clicks, options_chosen, session_id):
 
 if __name__ == '__main__':
     
-    dash_app.run_server(debug=True)
+    dash_app.run_server(debug=True, port=8052)
 
