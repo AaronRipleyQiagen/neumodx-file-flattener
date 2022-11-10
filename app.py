@@ -382,5 +382,5 @@ def download_function(n_clicks, options_chosen, session_id):
 
 if __name__ == '__main__':
     
-    dash_app.run_server(debug=True, port=8052)
+    dash_app.run_server(debug=True)
 
