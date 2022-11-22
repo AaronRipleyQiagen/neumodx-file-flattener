@@ -183,6 +183,9 @@ class nmdx_file_parser:
         if 'Target Result' not in flat_data.columns:
             flat_data['Target Result'] = np.nan
 
+        flat_data['Localized Result'] = np.where(flat_data['Localized Result'].isnull(), flat_data['Target Result'], flat_data['Localized Result'])
+        flat_data.drop(['Target Result'], axis=1, inplace=True)
+
         return flat_data.reset_index()
 
 
@@ -194,6 +197,7 @@ app = dash_app.server
 def add_module_side(data):
     data['Left / Right Module Side'] = np.nan
     data['Left / Right Module Side'] = np.where(data['Pcr Cartridge Lane']<7, 'Right', 'Left')
+    return data.reset_index().set_index(['Test Guid', 'Replicate Number', 'Target Result Guid', 'Channel', 'Processing Step'])
 
 def getRawMinusBlankCheckReads(data):
         """
@@ -202,19 +206,33 @@ def getRawMinusBlankCheckReads(data):
         ----------
         data (pandas.DataFrame) = DataFrame to be used for Calculation.
         """
-        RawReadsMinusBlankCheckFrame = data[['Processing Step', 'Test Guid', 'Replicate Number', 'Target Result Guid']+['Readings 1', 'Readings 2', 'Readings 3', 'Blank Reading']].copy()
+        RawReadsMinusBlankCheckFrame = data.reset_index()[['Processing Step', 'Test Guid', 'Replicate Number', 'Target Result Guid']+['Readings 1', 'Readings 2', 'Readings 3', 'Blank Reading']].copy()
         RawReadsMinusBlankCheckFrame.set_index(['Processing Step', 'Test Guid', 'Replicate Number', 'Target Result Guid'],inplace=True)
         RawReadsMinusBlankCheckFrame_Raw = RawReadsMinusBlankCheckFrame.loc['Raw']
         RawReadsMinusBlankCheckFrame_Raw['Blank Check - 1st 3 Reads'] = RawReadsMinusBlankCheckFrame_Raw[['Readings 1', 'Readings 2', 'Readings 3']].mean(axis=1) - RawReadsMinusBlankCheckFrame_Raw['Blank Reading']
         RawReadsMinusBlankCheckFrame = RawReadsMinusBlankCheckFrame.join(RawReadsMinusBlankCheckFrame_Raw[['Blank Check - 1st 3 Reads']])
         data['Blank Check - 1st 3 Reads'] = RawReadsMinusBlankCheckFrame['Blank Check - 1st 3 Reads'].values
+        return data.reset_index().set_index(['Test Guid', 'Replicate Number', 'Target Result Guid', 'Channel', 'Processing Step'])
+
+def channelParametersFlattener(data):
+    """
+    Retrieves Channel Specific stats and returns them all channels in one-dimmensional column.
+    stats:  Which Stats to flatten.
+    """
+    stats=['Localized Result']
+    channel_stats = data.reset_index().drop_duplicates(['Test Guid', 'Channel', 'Replicate Number']).set_index(['Test Guid', 'Replicate Number']).loc[:, stats+['Channel']].copy()
+    channel_stats = channel_stats.reset_index().pivot(columns='Channel',values=stats,index=['Test Guid', 'Replicate Number'])
+    channel_stats.columns = [y+" "+x for (x,y) in channel_stats.columns]
+    data = data.reset_index().set_index(['Test Guid', 'Replicate Number']).join(channel_stats)
+    return data.reset_index().set_index(['Test Guid', 'Replicate Number', 'Target Result Guid', 'Channel', 'Processing Step'])
 
 dash_app.myParser = nmdx_file_parser()
 dash_app.DataFrames = {}
 dash_app.title = 'NMDX Raw Data File Flattener'
 
 dash_app.annotation_functions = {'Add Left / Right Label': add_module_side,
-                                 'Add First Three Raw Reads - Blank Check':getRawMinusBlankCheckReads}
+                                 'Add First Three Raw Reads - Blank Check':getRawMinusBlankCheckReads,
+                                 'Add Inline Localized Results':channelParametersFlattener}
 
 def serve_layout():
     
@@ -249,7 +267,7 @@ def serve_layout():
                 id='my_checklist',                      # used to identify component in callback
                 options=[
                          {'label': x, 'value': x, 'disabled':False}
-                         for x in ['Add Left / Right Label', 'Add First Three Raw Reads - Blank Check']
+                         for x in ['Add Left / Right Label', 'Add First Three Raw Reads - Blank Check', 'Add Inline Localized Results']
                 ],
                 value=[],    # values chosen by default
 
@@ -370,17 +388,13 @@ def update_output(list_of_contents,  n_clicks, list_of_names, list_of_dates, ses
 )
 def download_function(n_clicks, options_chosen, session_id):
     
-    data_output = dash_app.DataFrames[session_id].copy()
+    data_output = dash_app.DataFrames[session_id].set_index(['Test Guid', 'Replicate Number', 'Target Result Guid', 'Channel', 'Processing Step']).copy()
     for option in options_chosen:
-        dash_app.annotation_functions[option](data_output)
+        data_output = dash_app.annotation_functions[option](data_output)
    
    
-    return dcc.send_data_frame(data_output.to_csv, "FlatData.csv", index=False)
-
-
-
+    return dcc.send_data_frame(data_output.reset_index().to_csv, "FlatData.csv", index=False)
 
 if __name__ == '__main__':
     
     dash_app.run_server(debug=True)
-
