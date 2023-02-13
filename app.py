@@ -346,7 +346,7 @@ def initialize_session(session_id):
     
     dash_app.DataFrames[session_id] = pd.DataFrame()
 
-    if len(dash_app.DataFrames) > 5:
+    if len(dash_app.DataFrames) > 30:
         dash_app.DataFrames.popitem()[0]
 
     
