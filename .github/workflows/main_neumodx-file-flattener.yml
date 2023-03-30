@@ -29,8 +29,7 @@ jobs:
       
       - name: Install dependencies
         run: pip install -r requirements.txt
-      
-      
+        
       # Optional: Add step to run tests here (PyTest, Django test suites, etc.)
       
       - name: Upload artifact for deployment jobs
@@ -61,4 +60,4 @@ jobs:
         with:
           app-name: 'neumodx-file-flattener'
           slot-name: 'Production'
-          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_11A86A3B092C439ABB1AF7CCA00AFA65 }}
+          publish-profile: ${{ secrets.AZUREAPPSERVICE_PUBLISHPROFILE_D9DB877C9CA449DFAAD805C5A11782DC }}
